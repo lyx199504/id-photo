@@ -5,6 +5,7 @@
 
 from PyQt5 import QtWidgets, QtGui
 from PIL import Image, ImageQt
+import math
 
 class Photo(QtWidgets.QWidget):
     def __init__(self):
@@ -62,11 +63,16 @@ class Photo(QtWidgets.QWidget):
         self.text6.setPlaceholderText("左下y坐标")
         self.text6.resize(buWidth, buHeight)
         self.text6.move(buWidth * 8, 0)
-        # 使用说明
-        button3 = QtWidgets.QPushButton("使用说明", self)
+        # 修改底色
+        button3 = QtWidgets.QPushButton("红色", self)
         button3.resize(buWidth, buHeight)
         button3.move(buWidth * 9, 0)
-        button3.clicked.connect(self.description)
+        button3.clicked.connect(self.editBackground)
+        # 使用说明
+        button4 = QtWidgets.QPushButton("使用说明", self)
+        button4.resize(buWidth, buHeight)
+        button4.move(buWidth * 10, 0)
+        button4.clicked.connect(self.description)
 
         # 子窗口大小
         self.swinWidth, self.swinHeight = self.winWidth / 2, self.winHeight - buHeight
@@ -108,6 +114,8 @@ class Photo(QtWidgets.QWidget):
     # 打开图片
     def getPhoto(self):
         self.openFile = QtWidgets.QFileDialog.getOpenFileName()[0]  # 打开文件获取链接
+        if not self.openFile:
+            return
         pix = QtGui.QPixmap(self.openFile)
         self.oriPhoWidth, self.oriPhoHeight = pix.width(), pix.height()
         widPerHei = self.oriPhoWidth / self.oriPhoHeight  # 照片的宽高比
@@ -124,6 +132,7 @@ class Photo(QtWidgets.QWidget):
         self.label1.setPixmap(pix)
         self.label1.resize(self.phoWidth, self.phoHeight)
         self.label1.setScaledContents(True)  # 图片自适应
+
     # 裁剪图片
     def crop(self):
         try:
@@ -159,12 +168,84 @@ class Photo(QtWidgets.QWidget):
     # 保存图片
     def setPhoto(self):
         self.saveFile = QtWidgets.QFileDialog.getSaveFileName()[0]
+        if not self.saveFile:
+            return
         try:
             dpi = float(self.text3.toPlainText().strip())
         except:
             dpi = 350
         self.img.save(self.saveFile, dpi=(dpi, dpi))
         self.img.close()
+        
+    def editBackground(self):
+        color = (255, 0, 0)
+        imgData = list(self.img.getdata())
+        width, height = self.img.size
+        newData = imgData.copy()
+        newData[0] = newData[width-1] = color
+        # 修改边缘像素点
+        for x in range(1, int(width/2)+1):  # 图像的x坐标
+            if self.colorEqual(imgData[x], imgData[0]):
+                newData[x] = color
+        for x in range(width-2, int(width/2), -1):
+            if self.colorEqual(imgData[x], imgData[width-1]):
+                newData[x] = color
+        left_down, right_down = 0, 0
+        for y in range(1, height):
+            if self.colorEqual(imgData[y*width], imgData[0]):
+                newData[y*width] = color
+            else:
+                left_down = y
+                break
+        for y in range(1, height):
+            if self.colorEqual(imgData[(y+1)*width-1], imgData[width-1]):
+                newData[(y+1)*width-1] = color
+            else:
+                right_down = y
+                break
+        # 修改非边缘像素点
+        for y in range(1, left_down):
+            for x in range(1, int(width/2)+1):
+                if self.colorEqual(imgData[y*width+x], imgData[y*width]):
+                    newData[y*width+x] = color
+        for y in range(1, right_down):
+            for x in range(width-2, int(width/2), -1):
+                if self.colorEqual(imgData[y*width+x], imgData[(y+1)*width-1]):
+                    newData[y*width+x] = color
+        # 精修像素点
+        k, c = 140, 5
+        for y in range(1, left_down):
+            left_x = 0
+            for x in range(1, int(width/2)+1):
+                if newData[y*width+x] != color:
+                    left_x = x
+                    break
+            if left_x != 0:
+                for x in range(left_x, left_x+c):
+                    if self.colorEqual(imgData[y*width+x], imgData[0], k):
+                        newData[y*width+x] = color
+        for y in range(1, right_down):
+            right_x = width-1
+            for x in range(width - 2, int(width / 2), -1):
+                if newData[y*width+x] != color:
+                    right_x = x
+                    break
+            if right_x != width-1:
+                for x in range(right_x, right_x-c, -1):
+                    if self.colorEqual(imgData[y*width+x], imgData[width-1], k):
+                        newData[y*width+x] = color
+
+        self.img.putdata(newData)
+        pix = ImageQt.toqpixmap(self.img)
+        self.label2.move((self.swinWidth - pix.width()) / 2, (self.swinHeight - pix.height()) / 2)
+        self.label2.setPixmap(QtGui.QPixmap())
+        self.label2.setPixmap(pix)
+        self.label2.resize(pix.width(), pix.height())
+        self.label2.setScaledContents(True)  # 图片自适应
+
+    def colorEqual(self, A, B, k=60):
+        dist = math.sqrt(sum([(a - b) ** 2 for (a, b) in zip(A, B)]))
+        return True if dist < k else False
 
     # 使用说明
     def description(self):
