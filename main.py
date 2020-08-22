@@ -67,12 +67,22 @@ class Photo(QtWidgets.QWidget):
         button3 = QtWidgets.QPushButton("红色", self)
         button3.resize(buWidth, buHeight)
         button3.move(buWidth * 9, 0)
-        button3.clicked.connect(self.editBackground)
-        # 使用说明
-        button4 = QtWidgets.QPushButton("使用说明", self)
+        button3.clicked.connect(lambda: self.editBackground((255, 0, 0)))
+
+        button4 = QtWidgets.QPushButton("蓝色", self)
         button4.resize(buWidth, buHeight)
         button4.move(buWidth * 10, 0)
-        button4.clicked.connect(self.description)
+        button4.clicked.connect(lambda: self.editBackground((67, 142, 219)))
+
+        button5 = QtWidgets.QPushButton("白色", self)
+        button5.resize(buWidth, buHeight)
+        button5.move(buWidth * 11, 0)
+        button5.clicked.connect(lambda: self.editBackground((255, 255, 255)))
+        # 使用说明
+        button6 = QtWidgets.QPushButton("使用说明", self)
+        button6.resize(buWidth, buHeight)
+        button6.move(buWidth * 12, 0)
+        button6.clicked.connect(self.description)
 
         # 子窗口大小
         self.swinWidth, self.swinHeight = self.winWidth / 2, self.winHeight - buHeight
@@ -90,6 +100,7 @@ class Photo(QtWidgets.QWidget):
         self.label1 = QtWidgets.QLabel(self.subwindow1)  # 原照片
         self.label1.mousePressEvent = self.getPhotoPos
         self.label2 = QtWidgets.QLabel(self.subwindow2)  # 处理后照片预览
+
     # 获取图片的坐标
     def getPhotoPos(self, event):
         try:
@@ -111,6 +122,7 @@ class Photo(QtWidgets.QWidget):
                 self.text5.setPlainText(str(event.x()))
             if y_down < 0:
                 self.text6.setPlainText(str(event.y()))
+
     # 打开图片
     def getPhoto(self):
         self.openFile = QtWidgets.QFileDialog.getOpenFileName()[0]  # 打开文件获取链接
@@ -136,8 +148,8 @@ class Photo(QtWidgets.QWidget):
     # 裁剪图片
     def crop(self):
         try:
-            width = float(self.text1.toPlainText().strip())
-            height = float(self.text2.toPlainText().strip())
+            width = int(self.text1.toPlainText().strip())
+            height = int(self.text2.toPlainText().strip())
         except:
             width, height = 319, 449
         try:
@@ -176,11 +188,15 @@ class Photo(QtWidgets.QWidget):
             dpi = 350
         self.img.save(self.saveFile, dpi=(dpi, dpi))
         self.img.close()
-        
-    def editBackground(self):
-        color = (255, 0, 0)
-        imgData = list(self.img.getdata())
-        width, height = self.img.size
+
+    # 换底色
+    def editBackground(self, color):
+        try:
+            imgData = list(self.img.getdata())
+            width, height = self.img.size
+        except:
+            QtWidgets.QMessageBox.about(self, "操作错误", "请先裁剪预览照片！")
+            return
         newData = imgData.copy()
         newData[0] = newData[width-1] = color
         # 修改边缘像素点
@@ -208,32 +224,32 @@ class Photo(QtWidgets.QWidget):
             for x in range(1, int(width/2)+1):
                 if self.colorEqual(imgData[y*width+x], imgData[y*width]):
                     newData[y*width+x] = color
+                else:
+                    break
         for y in range(1, right_down):
             for x in range(width-2, int(width/2), -1):
                 if self.colorEqual(imgData[y*width+x], imgData[(y+1)*width-1]):
                     newData[y*width+x] = color
+                else:
+                    break
         # 精修像素点
-        k, c = 140, 5
+        k = 140
         for y in range(1, left_down):
-            left_x = 0
             for x in range(1, int(width/2)+1):
-                if newData[y*width+x] != color:
-                    left_x = x
-                    break
-            if left_x != 0:
-                for x in range(left_x, left_x+c):
-                    if self.colorEqual(imgData[y*width+x], imgData[0], k):
-                        newData[y*width+x] = color
+                index = y * width + x
+                if newData[index] != color and (newData[index-1] == color or
+                    newData[index+1] == color or newData[index-width] == color or
+                    newData[index+width] == color):
+                    if self.colorEqual(imgData[index], imgData[0], k):
+                        newData[index] = color
         for y in range(1, right_down):
-            right_x = width-1
             for x in range(width - 2, int(width / 2), -1):
-                if newData[y*width+x] != color:
-                    right_x = x
-                    break
-            if right_x != width-1:
-                for x in range(right_x, right_x-c, -1):
-                    if self.colorEqual(imgData[y*width+x], imgData[width-1], k):
-                        newData[y*width+x] = color
+                index = y * width + x
+                if newData[index] != color and (newData[index-1] == color
+                    or newData[index+1] == color or newData[index-width] == color or
+                    newData[index+width] == color):
+                    if self.colorEqual(imgData[index], imgData[width-1], k):
+                        newData[index] = color
 
         self.img.putdata(newData)
         pix = ImageQt.toqpixmap(self.img)
