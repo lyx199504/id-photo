@@ -145,6 +145,9 @@ class Photo(QtWidgets.QWidget):
         self.label1.resize(self.phoWidth, self.phoHeight)
         self.label1.setScaledContents(True)  # 图片自适应
 
+        self.text4.setPlainText("")
+        self.text5.setPlainText("")
+        self.text6.setPlainText("")
     # 裁剪图片
     def crop(self):
         try:
